@@ -1,3 +1,5 @@
+obj-m := nxp_simtemp.o
+
 KERNEL_DIR ?= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 

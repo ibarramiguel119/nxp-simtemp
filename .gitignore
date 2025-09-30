@@ -1,0 +1,14 @@
+build
+*.o
+*.ko
+*.mod.c
+*.mod
+*.symvers
+*.order
+.tmp_versions/
+.depend
+.cache
+.*.cmd
+*.dtb
+*.dtbo
+*.elf
