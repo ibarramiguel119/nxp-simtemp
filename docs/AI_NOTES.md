@@ -33,6 +33,8 @@ Include module init/exit and all necessary headers."
 ### Add functionality using a timer
 Add functionality using a timer/hrtimer/workqueue to generate periodic samples. Currently, the sample is only generated on demand (via read()), not every N ms.
 
+### add sopport for poll()`/`epoll()
+In the context of a Linux kernel module named 'simtemp' that uses a misc device and an internal ring buffer (already implemented), generate the C code necessary to add support for asynchronous notification using poll/epoll.
 
 ## Validation of results 
 
@@ -42,3 +44,6 @@ Add functionality using a timer/hrtimer/workqueue to generate periodic samples. 
 ### Add functionality using a timer
 --**load the module**  with sudo insmod nxp_simtemp.ko
 --**verify the content** with  watch -n 1  dd if=/dev/simtemp bs=16 count=5 | hexdump -C and see the command shows updated timestamps and slightly different temperatures, confirming that periodic sampling via hrtimer is working correctly.
+
+### add sopport for poll()`/`epoll()
+Create a program to monitor events every time a new sample is available.

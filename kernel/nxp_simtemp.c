@@ -26,6 +26,7 @@
 #include <linux/hrtimer.h>
 #include <linux/mutex.h>
 #include <linux/wait.h>
+#include <linux/poll.h>
 
 #define SIMTEMP_FLAG_NEW_SAMPLE           (1u << 0)
 #define SIMTEMP_FLAG_THRESHOLD_CROSSED    (1u << 1)
@@ -73,24 +74,32 @@ static int produce_temperature_mC(void)
 /* Timer callback: push new sample into ring buffer */
 static enum hrtimer_restart sim_timer_cb(struct hrtimer *t)
 {
-	struct simdev *s = container_of(t, struct simdev, timer);
-	struct simtemp_sample sample;
+    struct simdev *s = container_of(t, struct simdev, timer);
+    struct simtemp_sample sample;
+    static int last_temp = 0;
 
-	sample.timestamp_ns = (u64)ktime_get_ns();
-	sample.temp_mC = produce_temperature_mC();
-	sample.flags = SIMTEMP_FLAG_NEW_SAMPLE;
+    sample.timestamp_ns = (u64)ktime_get_ns();
+    sample.temp_mC = produce_temperature_mC();
+    sample.flags = SIMTEMP_FLAG_NEW_SAMPLE;
 
-	mutex_lock(&s->lock);
-	s->buf[s->head] = sample;
-	s->head = (s->head + 1) % SIMTEMP_BUF_SIZE;
-	if (s->head == s->tail) /* overwrite oldest */
-		s->tail = (s->tail + 1) % SIMTEMP_BUF_SIZE;
-	mutex_unlock(&s->lock);
+    /* Detect threshold crossing */
+    if ((last_temp < s->threshold_mC && sample.temp_mC >= s->threshold_mC) ||
+        (last_temp >= s->threshold_mC && sample.temp_mC < s->threshold_mC)) {
+        sample.flags |= SIMTEMP_FLAG_THRESHOLD_CROSSED;
+    }
+    last_temp = sample.temp_mC;
 
-	wake_up_interruptible(&s->wq);
+    mutex_lock(&s->lock);
+    s->buf[s->head] = sample;
+    s->head = (s->head + 1) % SIMTEMP_BUF_SIZE;
+    if (s->head == s->tail) // overwrite oldest
+        s->tail = (s->tail + 1) % SIMTEMP_BUF_SIZE;
+    mutex_unlock(&s->lock);
 
-	hrtimer_forward_now(&s->timer, s->interval);
-	return HRTIMER_RESTART;
+    wake_up_interruptible(&s->wq); // Despertar lectores/pollers
+
+    hrtimer_forward_now(&s->timer, s->interval);
+    return HRTIMER_RESTART;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -141,12 +150,28 @@ static long sim_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return -ENOTTY;
 }
 
+static unsigned int sim_poll(struct file *file, poll_table *wait)
+{
+    struct simdev *s = gdev;
+    unsigned int mask = 0;
+
+    poll_wait(file, &s->wq, wait);
+
+    mutex_lock(&s->lock);
+    if (s->head != s->tail)
+        mask |= POLLIN | POLLRDNORM;
+    mutex_unlock(&s->lock);
+
+    return mask;
+}
+
 static const struct file_operations sim_fops = {
 	.owner          = THIS_MODULE,
 	.read           = sim_read,
 	.open           = sim_open,
 	.release        = sim_release,
 	.unlocked_ioctl = sim_ioctl,
+	.poll		    = sim_poll,
 };
 
 /* ---------------------------------------------------------------------- */
