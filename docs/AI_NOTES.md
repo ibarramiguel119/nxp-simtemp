@@ -36,6 +36,19 @@ Add functionality using a timer/hrtimer/workqueue to generate periodic samples. 
 ### add sopport for poll()`/`epoll()
 In the context of a Linux kernel module named 'simtemp' that uses a misc device and an internal ring buffer (already implemented), generate the C code necessary to add support for asynchronous notification using poll/epoll.
 
+### Integrate sysfs 
+Integrate the following sysfs controls into the existing driver under /sys/class/.../simtemp/:
+
+--sampling_ms (RW): update period in milliseconds.
+
+--threshold_mC (RW): alert threshold in milli‑°C.
+
+--mode (RW): e.g., "normal", "noisy", "ramp".
+
+--stats (RO): counters including updates, alerts, and last error.
+
+
+
 ## Validation of results 
 
 ### Initial prompt 
@@ -47,3 +60,15 @@ In the context of a Linux kernel module named 'simtemp' that uses a misc device 
 
 ### add sopport for poll()`/`epoll()
 Create a program to monitor events every time a new sample is available.
+
+### Integrate sysfs 
+--**load the module**  with sudo insmod nxp_simtemp.ko
+--**verify the content** ls /sys/class/misc/simtemp/ 
+--**Result** dev  mode  power  sampling_ms  stats  subsystem  threshold_mC  uevent
+--**verify the results** 
+--cat /sys/class/misc/simtemp/sampling_ms
+-- echo 2000 | sudo tee /sys/class/misc/simtemp/sampling_ms
+-- echo 500 | sudo tee /sys/class/misc/simtemp/threshold_mC
+--cat /sys/class/misc/simtemp/mode
+--echo noisy | sudo tee /sys/class/misc/simtemp/mode
+--cat /sys/class/misc/simtemp/stats

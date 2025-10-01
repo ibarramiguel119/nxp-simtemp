@@ -32,6 +32,15 @@
 #define SIMTEMP_FLAG_THRESHOLD_CROSSED    (1u << 1)
 #define SIMTEMP_BUF_SIZE 64
 
+
+/*operating modes */
+enum sim_mode{
+	SIM_MODE_NORMAL = 0,
+	SIM_MODE_NOISY,
+	SIM_MODE_RAMP,
+
+};
+
 /* public sample layout (packed, stable binary record) */
 struct simtemp_sample {
 	__u64 timestamp_ns;   /* monotonic timestamp */
@@ -42,6 +51,12 @@ struct simtemp_sample {
 struct simdev {
 	struct miscdevice mdev;
 	int threshold_mC;
+
+	/* mode + stats */
+    enum sim_mode mode;
+    u64 updates;
+    u64 alerts;
+    u64 last_error;
 
 	/* buffer of samples */
 	struct simtemp_sample buf[SIMTEMP_BUF_SIZE];
@@ -79,28 +94,132 @@ static enum hrtimer_restart sim_timer_cb(struct hrtimer *t)
     static int last_temp = 0;
 
     sample.timestamp_ns = (u64)ktime_get_ns();
-    sample.temp_mC = produce_temperature_mC();
-    sample.flags = SIMTEMP_FLAG_NEW_SAMPLE;
 
-    /* Detect threshold crossing */
+    switch (s->mode) {
+    case SIM_MODE_NORMAL:
+        sample.temp_mC = produce_temperature_mC();
+        break;
+    case SIM_MODE_NOISY:
+        sample.temp_mC = produce_temperature_mC() + (get_random_u32() % 2000 - 1000);
+        break;
+    case SIM_MODE_RAMP:
+    default:
+        static int ramp = 30000;
+        ramp += 100;
+        if (ramp > 80000)
+            ramp = 30000;
+        sample.temp_mC = ramp;
+        break;
+    }
+
+    sample.flags = SIMTEMP_FLAG_NEW_SAMPLE;
+    s->updates++;
+
     if ((last_temp < s->threshold_mC && sample.temp_mC >= s->threshold_mC) ||
         (last_temp >= s->threshold_mC && sample.temp_mC < s->threshold_mC)) {
         sample.flags |= SIMTEMP_FLAG_THRESHOLD_CROSSED;
+        s->alerts++;
     }
     last_temp = sample.temp_mC;
 
     mutex_lock(&s->lock);
     s->buf[s->head] = sample;
     s->head = (s->head + 1) % SIMTEMP_BUF_SIZE;
-    if (s->head == s->tail) // overwrite oldest
+    if (s->head == s->tail)
         s->tail = (s->tail + 1) % SIMTEMP_BUF_SIZE;
     mutex_unlock(&s->lock);
 
-    wake_up_interruptible(&s->wq); // Despertar lectores/pollers
+    wake_up_interruptible(&s->wq);
 
     hrtimer_forward_now(&s->timer, s->interval);
     return HRTIMER_RESTART;
 }
+
+/* ---------------------------------------------------------------------- */
+/* Sysfs attributes                                                       */
+/* ---------------------------------------------------------------------- */
+/* sampling_ms */
+static ssize_t sampling_ms_show(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+    struct simdev *s = gdev;
+    return sprintf(buf, "%lld\n", ktime_to_ms(s->interval));
+}
+
+static ssize_t sampling_ms_store(struct device *dev,
+        struct device_attribute *attr, const char *buf, size_t count)
+{
+    struct simdev *s = gdev;
+    unsigned long val;
+    if (kstrtoul(buf, 10, &val))
+        return -EINVAL;
+
+    if (val == 0)
+        return -EINVAL;
+
+    s->interval = ktime_set(0, val * 1000000ULL);
+    hrtimer_cancel(&s->timer);
+    hrtimer_start(&s->timer, s->interval, HRTIMER_MODE_REL);
+    return count;
+}
+static DEVICE_ATTR_RW(sampling_ms);
+
+/* threshold_mC */
+static ssize_t threshold_mC_show(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+    return sprintf(buf, "%d\n", gdev->threshold_mC);
+}
+static ssize_t threshold_mC_store(struct device *dev,
+        struct device_attribute *attr, const char *buf, size_t count)
+{
+    int val;
+    if (kstrtoint(buf, 10, &val))
+        return -EINVAL;
+    gdev->threshold_mC = val;
+    return count;
+}
+static DEVICE_ATTR_RW(threshold_mC);
+
+/* mode */
+static ssize_t mode_show(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+    struct simdev *s = gdev;
+    switch (s->mode) {
+    case SIM_MODE_NORMAL: return sprintf(buf, "normal\n");
+    case SIM_MODE_NOISY:  return sprintf(buf, "noisy\n");
+    case SIM_MODE_RAMP:   return sprintf(buf, "ramp\n");
+    }
+    return sprintf(buf, "unknown\n");
+}
+static ssize_t mode_store(struct device *dev,
+        struct device_attribute *attr, const char *buf, size_t count)
+{
+    struct simdev *s = gdev;
+    if (sysfs_streq(buf, "normal"))
+        s->mode = SIM_MODE_NORMAL;
+    else if (sysfs_streq(buf, "noisy"))
+        s->mode = SIM_MODE_NOISY;
+    else if (sysfs_streq(buf, "ramp"))
+        s->mode = SIM_MODE_RAMP;
+    else
+        return -EINVAL;
+    return count;
+}
+static DEVICE_ATTR_RW(mode);
+
+/* stats (RO) */
+static ssize_t stats_show(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+    struct simdev *s = gdev;
+    return sprintf(buf,
+        "updates=%llu alerts=%llu last_error=%llu\n",
+        s->updates, s->alerts, s->last_error);
+}
+static DEVICE_ATTR_RO(stats);
+
 
 /* ---------------------------------------------------------------------- */
 /* File operations                                                        */
@@ -202,6 +321,14 @@ static int sim_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	ret = device_create_file(s->mdev.this_device, &dev_attr_sampling_ms);
+	ret |= device_create_file(s->mdev.this_device, &dev_attr_threshold_mC);
+	ret |= device_create_file(s->mdev.this_device, &dev_attr_mode);
+	ret |= device_create_file(s->mdev.this_device, &dev_attr_stats);
+	if (ret)
+		pr_warn("simtemp: failed to create sysfs attributes\n");
+	
+
 	platform_set_drvdata(pdev, s);
 	gdev = s;
 
@@ -223,6 +350,10 @@ static void sim_remove(struct platform_device *pdev)
 
 	if (!s)
 		return;
+	device_remove_file(s->mdev.this_device, &dev_attr_sampling_ms);
+	device_remove_file(s->mdev.this_device, &dev_attr_threshold_mC);
+	device_remove_file(s->mdev.this_device, &dev_attr_mode);
+	device_remove_file(s->mdev.this_device, &dev_attr_stats);
 
 	hrtimer_cancel(&s->timer);
 	misc_deregister(&s->mdev);
