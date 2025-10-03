@@ -27,6 +27,9 @@
 #include <linux/mutex.h>
 #include <linux/wait.h>
 #include <linux/poll.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
+
 
 #define SIMTEMP_FLAG_NEW_SAMPLE           (1u << 0)
 #define SIMTEMP_FLAG_THRESHOLD_CROSSED    (1u << 1)
@@ -299,49 +302,63 @@ static const struct file_operations sim_fops = {
 
 static int sim_probe(struct platform_device *pdev)
 {
-	struct simdev *s;
-	int ret;
+    struct simdev *s;
+    struct device_node *np = pdev->dev.of_node;
+    u32 val;
+    int ret;
 
-	pr_info("simtemp: probe called\n");
+    pr_info("simtemp: probe called\n");
 
-	s = kzalloc(sizeof(*s), GFP_KERNEL);
-	if (!s)
-		return -ENOMEM;
+    s = kzalloc(sizeof(*s), GFP_KERNEL);
+    if (!s)
+        return -ENOMEM;
 
-	s->threshold_mC = 45000; /* default */
+    /* defaults */
+    s->threshold_mC = 45000;                /* 45.0 °C */
+    s->interval = ktime_set(0, 100 * 1000000ULL);  /* 100 ms */
 
-	s->mdev.minor = MISC_DYNAMIC_MINOR;
-	s->mdev.name = "simtemp";
-	s->mdev.fops = &sim_fops;
+    /* override from DT if present */
+    if (np) {
+        if (!of_property_read_u32(np, "sampling-ms", &val) && val > 0)
+            s->interval = ktime_set(0, val * 1000000ULL);
 
-	ret = misc_register(&s->mdev);
-	if (ret) {
-		pr_err("simtemp: misc_register failed %d\n", ret);
-		kfree(s);
-		return ret;
-	}
+        if (!of_property_read_u32(np, "threshold-mC", &val))
+            s->threshold_mC = val;
+    }
 
-	ret = device_create_file(s->mdev.this_device, &dev_attr_sampling_ms);
-	ret |= device_create_file(s->mdev.this_device, &dev_attr_threshold_mC);
-	ret |= device_create_file(s->mdev.this_device, &dev_attr_mode);
-	ret |= device_create_file(s->mdev.this_device, &dev_attr_stats);
-	if (ret)
-		pr_warn("simtemp: failed to create sysfs attributes\n");
-	
+    /* misc device setup */
+    s->mdev.minor = MISC_DYNAMIC_MINOR;
+    s->mdev.name = "simtemp";
+    s->mdev.fops = &sim_fops;
 
-	platform_set_drvdata(pdev, s);
-	gdev = s;
+    ret = misc_register(&s->mdev);
+    if (ret) {
+        pr_err("simtemp: misc_register failed %d\n", ret);
+        kfree(s);
+        return ret;
+    }
 
-	mutex_init(&s->lock);
-	init_waitqueue_head(&s->wq);
+    ret = device_create_file(s->mdev.this_device, &dev_attr_sampling_ms);
+    ret |= device_create_file(s->mdev.this_device, &dev_attr_threshold_mC);
+    ret |= device_create_file(s->mdev.this_device, &dev_attr_mode);
+    ret |= device_create_file(s->mdev.this_device, &dev_attr_stats);
+    if (ret)
+        pr_warn("simtemp: failed to create sysfs attributes\n");
 
-	s->interval = ktime_set(0, 100 * 1000000); /* 100 ms default */
-	hrtimer_init(&s->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	s->timer.function = sim_timer_cb;
-	hrtimer_start(&s->timer, s->interval, HRTIMER_MODE_REL);
+    platform_set_drvdata(pdev, s);
+    gdev = s;
 
-	pr_info("simtemp: /dev/%s ready\n", s->mdev.name);
-	return 0;
+    mutex_init(&s->lock);
+    init_waitqueue_head(&s->wq);
+
+    /* start timer with current interval */
+    hrtimer_init(&s->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+    s->timer.function = sim_timer_cb;
+    hrtimer_start(&s->timer, s->interval, HRTIMER_MODE_REL);
+
+    pr_info("simtemp: /dev/%s ready (interval=%lld ms, threshold=%d mC)\n",
+            s->mdev.name, ktime_to_ms(s->interval), s->threshold_mC);
+    return 0;
 }
 
 static void sim_remove(struct platform_device *pdev)
@@ -361,12 +378,20 @@ static void sim_remove(struct platform_device *pdev)
 	gdev = NULL;
 }
 
+static const struct of_device_id sim_of_match[] = {
+    { .compatible = "nxp,simtemp", },
+    { /* sentinel */ }
+};
+
+MODULE_DEVICE_TABLE(of, sim_of_match);
+
 static struct platform_driver sim_driver = {
 	.probe  = sim_probe,
 	.remove = sim_remove,
 	.driver = {
 		.name  = "nxp_simtemp",
 		.owner = THIS_MODULE,
+		.of_match_table = sim_of_match, 
 	},
 };
 
@@ -376,32 +401,39 @@ static struct platform_driver sim_driver = {
 
 static int __init sim_init(void)
 {
-	int ret;
+    int ret;
 
-	ret = platform_driver_register(&sim_driver);
-	if (ret) {
-		pr_err("simtemp: platform_driver_register failed %d\n", ret);
-		return ret;
-	}
+    ret = platform_driver_register(&sim_driver);
+    if (ret) {
+        pr_err("simtemp: platform_driver_register failed %d\n", ret);
+        return ret;
+    }
 
-	/* test device so probe() runs without DT */
-	g_test_pdev = platform_device_register_simple("nxp_simtemp", -1, NULL, 0);
-	if (IS_ERR(g_test_pdev)) {
-		pr_warn("simtemp: could not create test platform_device (continuing)\n");
-		g_test_pdev = NULL;
-	}
+#ifndef CONFIG_OF
+    /* Si no hay soporte OF/DT, registramos un fake device */
+    g_test_pdev = platform_device_register_simple("nxp_simtemp", -1, NULL, 0);
+    if (IS_ERR(g_test_pdev)) {
+        pr_err("simtemp: failed to create test platform_device\n");
+        g_test_pdev = NULL;
+    } else {
+        pr_info("simtemp: test platform_device registered (no DT)\n");
+    }
+#endif
 
-	pr_info("simtemp: module loaded\n");
-	return 0;
+    pr_info("simtemp: module loaded\n");
+    return 0;
 }
 
 static void __exit sim_exit(void)
 {
-	if (g_test_pdev)
-		platform_device_unregister(g_test_pdev);
-
-	platform_driver_unregister(&sim_driver);
-	pr_info("simtemp: module unloaded\n");
+	#ifndef CONFIG_OF
+		if (g_test_pdev) {
+			platform_device_unregister(g_test_pdev);
+			g_test_pdev = NULL;
+		}
+	#endif
+    platform_driver_unregister(&sim_driver);
+    pr_info("simtemp: module unloaded\n");
 }
 
 module_init(sim_init);
