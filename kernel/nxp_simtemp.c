@@ -95,9 +95,13 @@ static enum hrtimer_restart sim_timer_cb(struct hrtimer *t)
     struct simdev *s = container_of(t, struct simdev, timer);
     struct simtemp_sample sample;
     static int last_temp = 0;
+    struct timespec64 ts;
 
-    sample.timestamp_ns = (u64)ktime_get_ns();
+    /*get real time*/
+    ktime_get_real_ts64(&ts);
+    sample.timestamp_ns = (u64)ts.tv_sec * NSEC_PER_SEC + ts.tv_nsec;
 
+    
     switch (s->mode) {
     case SIM_MODE_NORMAL:
         sample.temp_mC = produce_temperature_mC();
@@ -441,5 +445,5 @@ module_exit(sim_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Miguel Elibert Ibarra Rodriguez <ibarramiguel119@gmail.com>");
-MODULE_DESCRIPTION("nxp_simtemp - step2: /dev/simtemp with periodic hrtimer sampling");
+MODULE_DESCRIPTION("nxp_simtemp: /dev/simtemp with periodic hrtimer sampling");
 MODULE_VERSION("0.2");
