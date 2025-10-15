@@ -1,6 +1,5 @@
-p_simtemp
 
-**Simulated Temperature Sensor Linux Kernel Driver**
+# **Simulated Temperature Sensor Linux Kernel Driver**
 
 ---
 
@@ -17,7 +16,7 @@ The driver periodically generates temperature samples using an **hrtimer**, allo
 
 ---
 
-##Features
+## Features
 
 - Configurable **sampling interval**, **threshold**, and **operating mode** (`normal`, `noisy`, `ramp`)  
 - User-space access via `/dev/simtemp` (supports `read()` and `poll()`)  
@@ -137,7 +136,7 @@ nxp_simtemp/
 
 ---
 
-##Detailed Documentation
+## Detailed Documentation
 
 For a full explanation of:
 
