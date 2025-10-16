@@ -134,6 +134,59 @@ nxp_simtemp/
     └── gui
 ```
 
+### Make the build script executable and run
+
+From the repository root:
+
+```bash
+# Make the script executable (one-time)
+chmod +x scripts/build.sh
+
+# Run the build script
+./scripts/build.sh
+```
+The command `chmod +x scripts/build.sh` grants the script executable permission so it can be launched directly. Running `./scripts/build.sh` executes the script from the repository root; the script will verify kernel headers, build the kernel module, and optionally install Python dependencies for the CLI. Note: the script uses `set -e`, so it will stop immediately if any step fails.
+
+
+
+### Demo Script: run_demo.sh
+
+A helper script to exercise the module end-to-end: insert the kernel object, configure sysfs attributes (if present), run the user-space CLI test, and remove the module.
+
+From the repository root:
+
+```bash
+# Make the demo script executable (one-time)
+chmod +x scripts/run_demo.sh
+
+# Run the demo
+./scripts/run_demo.sh
+```
+
+What the script does:
+- Verifies `kernel/nxp_simtemp.ko` exists (exit code 1 if missing).
+- Inserts the module with `sudo insmod` (requires sudo — fail if insmod fails).
+- Checks `/dev/simtemp` was created (exit code 2 if missing).
+- Optionally writes sane values to sysfs attributes (sampling_ms, threshold_mC) if available.
+- Runs the bundled CLI test `user/cli/cli_simtemp.py --test` (exit code 4 on test failure).
+- Removes the module with `sudo rmmod` (exit code 3 if unload fails).
+- Prints dmesg snippets and reports success/failure.
+
+Notes:
+- The script uses `set -e` so it aborts on the first error; inspect the printed messages for diagnostics.
+- Commands that require elevated privileges (insmod, rmmod, writing sysfs) use `sudo`.
+- If the CLI test requires Python deps, install them before running the demo:
+  ```bash
+  pip install -r user/cli/requirements.txt
+  ```
+- Typical return codes:
+  - 0 — success
+  - 1 — module file missing or insmod failed
+  - 2 — device node not created
+  - 3 — rmmod failed
+  - 4 — CLI test failed
+
+
 ---
 
 ## Detailed Documentation
