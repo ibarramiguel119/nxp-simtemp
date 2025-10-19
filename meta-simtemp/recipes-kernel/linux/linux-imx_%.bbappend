@@ -5,32 +5,31 @@ DESCRIPTION = "Overlay for the simtemp driver"
 LICENSE = "CLOSED"
 
 # =================================================================
-# Additional Files (where the DTS is located)
+# Additional Files (location of the DTS)
 # =================================================================
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 # =================================================================
-# Necessary Dependencies
+# Required Dependencies
 # =================================================================
 DEPENDS += "dtc-native"
 
 # =================================================================
-# Manually Compile the DTS Overlay
+# Compile the DTS Overlay Manually
 # =================================================================
 do_compile:append() {
     echo "==> Copying simtemp-overlay.dts and compiling..."
 
     mkdir -p ${B}/overlays
-    echo "==> passing this path 1..."  
+    echo "==> Passing path 1..."  
 
     # Copy the DTS from the current layer
     cp /home/elibert/prueba_copilacion_yocto/imx-yocto-bsp/sources/meta-simtemp/recipes-kernel/linux/files/simtemp-overlay.dts ${B}/simtemp-overlay.dts
 
-    echo "==> passing this path 2..."  
+    echo "==> Passing path 2..."  
 
     # Compile the overlay
     dtc -@ -I dts -O dtb -o ${B}/overlays/simtemp.dtbo ${B}/simtemp-overlay.dts
-
 }
 
 # =================================================================
