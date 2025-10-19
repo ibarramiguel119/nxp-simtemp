@@ -81,9 +81,9 @@ echo noisy > /sys/class/misc/simtemp/mode
 The `simtemp_cli.py` script provides a convenient interface for testing:
 
 ```bash
-python3 simtemp_cli.py --sampling-ms 200 --threshold-mC 46000 --mode noisy
-python3 simtemp_cli.py --show-sysfs
-python3 simtemp_cli.py --test
+python3 cli_simtemp.py --sampling-ms 200 --threshold-mC 46000 --mode noisy
+python3 cli_simtemp.py --show-sysfs
+python3 cli_simtemp.py --test
 ```
 
 ---

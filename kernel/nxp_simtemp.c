@@ -414,7 +414,7 @@ static int __init sim_init(void)
     }
 
 #ifndef CONFIG_OF
-    /* Si no hay soporte OF/DT, registramos un fake device */
+    /* If there is no OF/DT support, we register a fake device */
     g_test_pdev = platform_device_register_simple("nxp_simtemp", -1, NULL, 0);
     if (IS_ERR(g_test_pdev)) {
         pr_err("simtemp: failed to create test platform_device\n");

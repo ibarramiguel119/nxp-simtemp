@@ -413,8 +413,8 @@ static int __init sim_init(void)
         return ret;
     }
 
-//#ifndef CONFIG_OF
-    /* Si no hay soporte OF/DT, registramos un fake device */
+#ifndef CONFIG_OF
+    /* If there is no OF/DT support, we register a fake device */
     g_test_pdev = platform_device_register_simple("nxp_simtemp", -1, NULL, 0);
     if (IS_ERR(g_test_pdev)) {
         pr_err("simtemp: failed to create test platform_device\n");
@@ -422,7 +422,7 @@ static int __init sim_init(void)
     } else {
         pr_info("simtemp: test platform_device registered (no DT)\n");
     }
-//#endif
+#endif
 
     pr_info("simtemp: module loaded\n");
     return 0;

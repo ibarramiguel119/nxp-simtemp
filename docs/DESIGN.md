@@ -130,19 +130,19 @@ The CLI `simtemp_cli.py` allows interaction with `/dev/simtemp` and driver confi
 
 ```bash
 # Read infinite samples
-python3 simtemp_cli.py --dev /dev/simtemp
+python3 cli_simtemp.py --dev /dev/simtemp
 
 # Read 5 samples
-python3 simtemp_cli.py --count 5
+python3 cli_simtemp.py --count 5
 
 # Configure parameters
-python3 simtemp_cli.py --sampling-ms 200 --threshold-mC 46000 --mode noisy
+python3 cli_simtemp.py --sampling-ms 200 --threshold-mC 46000 --mode noisy
 
 # Show sysfs attributes
-python3 simtemp_cli.py --show-sysfs
+python3 cli_simtemp.py --show-sysfs
 
 # Run alert test
-python3 simtemp_cli.py --test
+python3 cli_simtemp.py --test
 ```
 
 ---
