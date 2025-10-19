@@ -1,11 +1,18 @@
-obj-m := nxp_simtemp.o
+SUMMARY = "Simtemp kernel module"
+LICENSE = "CLOSED"
 
-KDIR ?= $(KERNEL_SRC)
-KDIR ?= $(KERNEL_PATH)
-KDIR ?= /lib/modules/$(shell uname -r)/build
+inherit module
 
-all:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
+SRC_URI = "git://github.com/ibarramiguel119/nxp-simtemp.git;protocol=https;branch=refactor/simtemp-unified-source"
+SRCREV = "${AUTOREV}"
 
-clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
+
+S = "${WORKDIR}/git/kernel"
+
+
+# The inherit of module.bbclass will automatically name module packages with
+# "kernel-module-" prefix as required by the oe-core build environment.
+
+RPROVIDES:${PN} += "kernel-module-hello"
+KERNEL_MODULE_AUTOLOAD += "simtemp"
+
