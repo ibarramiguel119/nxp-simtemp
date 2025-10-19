@@ -1,10 +1,11 @@
 obj-m := nxp_simtemp.o
 
-KERNEL_DIR ?= /lib/modules/$(shell uname -r)/build
-PWD := $(shell pwd)
+KDIR ?= $(KERNEL_SRC)
+KDIR ?= $(KERNEL_PATH)
+KDIR ?= /lib/modules/$(shell uname -r)/build
 
 all:
-	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules
+	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
 clean:
-	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) clean
+	$(MAKE) -C $(KDIR) M=$(PWD) clean

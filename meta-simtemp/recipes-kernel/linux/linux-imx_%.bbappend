@@ -1,40 +1,40 @@
 # =================================================================
-# Overlay simtemp para kernel i.MX
+# Simtemp Overlay for i.MX Kernel
 # =================================================================
-DESCRIPTION = "Overlay para el driver simtemp"
+DESCRIPTION = "Overlay for the simtemp driver"
 LICENSE = "CLOSED"
 
 # =================================================================
-# Archivos adicionales (donde está el DTS)
+# Additional Files (where the DTS is located)
 # =================================================================
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 # =================================================================
-# Dependencias necesarias
+# Necessary Dependencies
 # =================================================================
 DEPENDS += "dtc-native"
 
 # =================================================================
-# Compilar el overlay DTS manualmente
+# Manually Compile the DTS Overlay
 # =================================================================
 do_compile:append() {
-    echo "==> Copiando simtemp-overlay.dts y compilando..."
+    echo "==> Copying simtemp-overlay.dts and compiling..."
 
     mkdir -p ${B}/overlays
-    echo "==> paso esta ruta 1..." 
+    echo "==> passing this path 1..."  
 
-    # Copiar el DTS desde el layer actual
+    # Copy the DTS from the current layer
     cp /home/elibert/prueba_copilacion_yocto/imx-yocto-bsp/sources/meta-simtemp/recipes-kernel/linux/files/simtemp-overlay.dts ${B}/simtemp-overlay.dts
 
-    echo "==> paso esta ruta  2..." 
+    echo "==> passing this path 2..."  
 
-    # Compilar el overlay
+    # Compile the overlay
     dtc -@ -I dts -O dtb -o ${B}/overlays/simtemp.dtbo ${B}/simtemp-overlay.dts
 
 }
 
 # =================================================================
-# Instalar y desplegar el overlay compilado
+# Install and Deploy the Compiled Overlay
 # =================================================================
 do_install:append() {
     install -Dm 0644 ${B}/overlays/simtemp.dtbo ${D}/boot/overlays/simtemp.dtbo
