@@ -114,3 +114,16 @@ To validate CLI tool functionality in **Test Mode**:
    python3 simtemp_cli.py --mode noisy
    python3 simtemp_cli.py --show-sysfs
    ```
+
+## Research & Tooling
+
+- **ChatGPT (chat.openai.com):** used for investigation and implementation support related to:
+  - Creating Yocto recipes and layer integration.
+  - Configuring the Yocto build environment.
+  - Preparing QEMU deployment steps and device-tree overlays.
+  - Assistance with git-related workflow notes and repository layout.
+
+- **GitHub Copilot:** used to assist generating project documentation, examples, and code snippets included in the repository.
+
+Notes:
+- AI outputs were reviewed and adapted; final responsibility for correctness and licensing remains with the project maintainers.   
