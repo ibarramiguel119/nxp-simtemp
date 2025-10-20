@@ -15,40 +15,19 @@ SRCREV = "${AUTOREV}"
 # Directory inside the repository where the Python script resides
 S = "${WORKDIR}/git/user/cli"
 
-# =================================================================
-# Architecture independent (Python script)
-# =================================================================
-inherit allarch
-
-# =================================================================
-# No compilation required
-# =================================================================
+# Dont exit compilation
 do_compile() {
     :
 }
 
-# =================================================================
-# No unpacking needed (Git fetch handled by Yocto)
-# =================================================================
-do_unpack() {
-    :
-}
 
-# =================================================================
-# Install the CLI script into the bindir
-# =================================================================
 do_install() {
     install -d ${D}${bindir}
     install -m 0755 ${S}/simtemp_cli.py ${D}${bindir}/simtemp-cli
-   
 }
 
-# =================================================================
-# Runtime dependencies
-# =================================================================
 RDEPENDS_${PN} = "python3"
-
-# =================================================================
-# Files to include in the package
-# =================================================================
 FILES_${PN} = "${bindir}/simtemp-cli"
+
+inherit allarch
+
