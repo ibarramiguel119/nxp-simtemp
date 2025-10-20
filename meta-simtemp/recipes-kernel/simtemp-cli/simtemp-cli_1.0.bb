@@ -7,7 +7,7 @@ LICENSE = "CLOSED"
 # =================================================================
 # Source code comes from the same Git repository as the driver
 # =================================================================
-SRC_URI = "git://github.com/ibarramiguel119/nxp-simtemp.git;protocol=https;branch=master"
+SRC_URI = "git://github.com/ibarramiguel119/nxp-simtemp.git;protocol=https;branch=refactor/simtemp-unified-source"
 
 # Specific commit to ensure reproducible builds
 SRCREV = "${AUTOREV}"
@@ -40,6 +40,7 @@ do_unpack() {
 do_install() {
     install -d ${D}${bindir}
     install -m 0755 ${S}/simtemp_cli.py ${D}${bindir}/simtemp-cli
+   
 }
 
 # =================================================================
