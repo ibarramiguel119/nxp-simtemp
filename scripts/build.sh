@@ -22,8 +22,8 @@ echo "[INFO] Compiling module against $(uname -r)"
 make -C "$KDIR" M="$PWD/kernel" modules
 
 # === Build / check user CLI ===
-if [ -f "user/cli/cli_simtemp.py" ]; then
-    echo "[INFO] Found user CLI: user/cli/cli_simtemp.py"
+if [ -f "user/cli/simtemp_cli.py" ]; then
+    echo "[INFO] Found user CLI: user/cli/simtemp_cli.py"
     # Optional: install Python requirements if exists
     if [ -f "user/cli/requirements.txt" ]; then
         echo "[INFO] Installing Python dependencies..."
@@ -32,11 +32,11 @@ if [ -f "user/cli/cli_simtemp.py" ]; then
         echo "[INFO] No requirements.txt found; skipping dependency install."
     fi
 else
-    echo "[WARN] No user CLI found at user/cli/cli_simtemp.py"
+    echo "[WARN] No user CLI found at user/cli/simtemp_cli.py"
 fi
 
 # === Done ===
 echo
 echo "[SUCCESS] Build completed successfully!"
 echo "[INFO] Kernel module: kernel/nxp_simtemp.ko"
-echo "[INFO] User CLI: user/cli/cli_simtemp.py"
+echo "[INFO] User CLI: user/cli/simptemp_cli.py"

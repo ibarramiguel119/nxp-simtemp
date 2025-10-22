@@ -1,9 +1,9 @@
 #!/bin/bash
-# Demo script for NXP SimTemp kernel module
-# Performs: insmod → configure → run CLI test → rmmod
+# Extended Demo Script for NXP SimTemp Kernel Module
+# Performs: insmod → configure → test all modes (normal/noisy/ramp) → rmmod
 # Returns non-zero on failure
 
-set -e  # abort on first failure
+set -e  # Abort on first failure
 
 ROOT_DIR=$(dirname "$(readlink -f "$0")")/..
 cd "$ROOT_DIR"
@@ -11,14 +11,25 @@ cd "$ROOT_DIR"
 MOD="nxp_simtemp"
 KO_PATH="kernel/${MOD}.ko"
 DEV="/dev/simtemp"
+CLI_PATH="user/cli/simtemp_cli.py"
 
-echo "[INFO] === NXP SimTemp Demo ==="
+echo "[INFO] === NXP SimTemp Extended Demo ==="
 
 # --- Step 1: Check module exists ---
 if [ ! -f "$KO_PATH" ]; then
     echo "[ERROR] Module file not found: $KO_PATH"
     echo "Run ./scripts/build.sh first."
     exit 1
+fi
+
+# --- Step 1.5: Remove module if already loaded ---
+if lsmod | grep -q "^${MOD}"; then
+    echo "[INFO] Module already loaded, removing first..."
+    sudo rmmod "$MOD" || {
+        echo "[ERROR] Failed to remove existing module."
+        exit 1
+    }
+    sleep 1
 fi
 
 # --- Step 2: Insert module ---
@@ -39,7 +50,7 @@ if [ ! -e "$DEV" ]; then
 fi
 echo "[OK] Device node created: $DEV"
 
-# --- Step 4: Try to locate sysfs path ---
+# --- Step 4: Locate sysfs path ---
 SYSFS_PATH=$(find /sys/class -type d -name "simtemp*" | head -n 1)
 if [ -n "$SYSFS_PATH" ]; then
     echo "[OK] Sysfs path: $SYSFS_PATH"
@@ -47,18 +58,16 @@ else
     echo "[WARN] Sysfs attributes not found (expected for early versions)."
 fi
 
-# --- Step 5: Configure (if sysfs available) ---
+# --- Step 5: Base Configuration ---
 if [ -n "$SYSFS_PATH" ]; then
-    if [ -f "$SYSFS_PATH/sampling_ms" ]; then
-        echo "[INFO] Setting sampling period to 200ms"
-        echo 200 | sudo tee "$SYSFS_PATH/sampling_ms" >/dev/null
-    fi
-    if [ -f "$SYSFS_PATH/threshold_mC" ]; then
-        echo "[INFO] Setting threshold to 45000 m°C"
-        echo 45000 | sudo tee "$SYSFS_PATH/threshold_mC" >/dev/null
-    fi
+    echo "[INFO] Setting base configuration..."
+    echo 200 | sudo tee "$SYSFS_PATH/sampling_ms" >/dev/null || true
+    echo 45000 | sudo tee "$SYSFS_PATH/threshold_mC" >/dev/null || true
+fi
 
-    echo "[INFO] Current sysfs values:"
+echo
+echo "[INFO] === Sysfs initial values ==="
+if [ -n "$SYSFS_PATH" ]; then
     for attr in sampling_ms threshold_mC mode stats; do
         [ -f "$SYSFS_PATH/$attr" ] && echo "  $attr = $(cat $SYSFS_PATH/$attr)"
     done
@@ -69,30 +78,46 @@ echo
 echo "[INFO] Kernel log (last 10 lines):"
 dmesg | tail -n 10
 
-# --- Step 6.5: Run CLI test ---
-CLI_PATH="user/cli/cli_simtemp.py"
-if [ -f "$CLI_PATH" ]; then
-    echo
-    echo "[INFO] Running CLI test: $CLI_PATH"
-    python3 "$CLI_PATH" --test || {
-        echo "[ERROR] CLI test failed!"
-        sudo rmmod "$MOD" || true
-        exit 4
-    }
-else
-    echo "[WARN] CLI test not found at $CLI_PATH (skipping user-space test)."
+# --- Step 7: Run mode tests ---
+if [ ! -f "$CLI_PATH" ]; then
+    echo "[ERROR] CLI script not found at $CLI_PATH"
+    sudo rmmod "$MOD" || true
+    exit 3
 fi
 
-# --- Step 7: Unload module ---
+echo
+echo "[INFO] === Running CLI configuration tests ==="
+
+for mode in normal noisy ramp; do
+    echo
+    echo "[INFO] --- Testing mode: $mode ---"
+    
+    python3 "$CLI_PATH" --sampling-ms 200 --threshold-mC 46000 --mode "$mode" --show-sysfs
+
+    echo "[INFO] Collecting 5 samples in mode: $mode"
+    python3 "$CLI_PATH" --count 10
+done
+
+# --- Step 8: Run functional self-test ---
+echo
+echo "[INFO] Running CLI automated test (--test)"
+python3 "$CLI_PATH" --test || {
+    echo "[ERROR] CLI test failed!"
+    sudo rmmod "$MOD" || true
+    exit 4
+}
+
+# --- Step 9: Remove module ---
+echo
 echo "[INFO] Removing module..."
 sudo rmmod "$MOD" || {
     echo "[ERROR] Failed to remove module."
-    exit 3
+    exit 5
 }
 
 sleep 1
 
-# --- Step 8: Verify cleanup ---
+# --- Step 10: Verify cleanup ---
 if [ -e "$DEV" ]; then
     echo "[WARN] /dev/simtemp still exists after rmmod (check udev rules)."
 else
@@ -100,4 +125,4 @@ else
 fi
 
 echo
-echo "[SUCCESS] Demo completed successfully!"
+echo "[SUCCESS] All tests completed successfully!"
