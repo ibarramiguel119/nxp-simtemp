@@ -215,7 +215,7 @@ def run_test(args):
 
     # Poll for next sample (2 periods + 200ms margin)
     timeout_ms = 10 * sampling_ms
-    print(f"waiting up to {timeout_ms} ms for an alert (2 periods)...")
+    print(f"waiting up to {timeout_ms} ms for an alert (10 periods)...")
 
     fd = os.open(args.dev, os.O_RDONLY | os.O_NONBLOCK)
     poll = select.poll()

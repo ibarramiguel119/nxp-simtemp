@@ -7,7 +7,7 @@ LICENSE = "CLOSED"
 # =================================================================
 # Source code comes from the same Git repository as the driver
 # =================================================================
-SRC_URI = "git://github.com/ibarramiguel119/nxp-simtemp.git;protocol=https;branch=refactor/simtemp-unified-source"
+SRC_URI = "git://github.com/ibarramiguel119/nxp-simtemp.git;protocol=https;branch=master"
 
 # Specific commit to ensure reproducible builds
 SRCREV = "${AUTOREV}"

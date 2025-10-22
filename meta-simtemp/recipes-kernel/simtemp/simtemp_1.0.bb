@@ -4,7 +4,7 @@ LICENSE = "CLOSED"
 
 inherit module
 
-SRC_URI = "git://github.com/ibarramiguel119/nxp-simtemp.git;protocol=https;branch=refactor/simtemp-unified-source"
+SRC_URI = "git://github.com/ibarramiguel119/nxp-simtemp.git;protocol=https;branch=master"
 SRCREV = "${AUTOREV}"
 
 
