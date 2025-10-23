@@ -373,3 +373,18 @@ For a full explanation of:
 See [`DESIGN.md`](./DESIGN.md)
 
 ---
+
+## Submission Links
+
+- **Git Repository:** https://github.com/ibarramiguel119/nxp-simtemp
+- **Demo Video:** https://youtu.be/WTzGt1k8bjM
+- **Next steps (if more time):**
+  - Integrate a Qt-based GUI for real-time visualization.
+  - Add unit and automated tests for the CLI application.
+  - Extend support for multiple virtual sensors.
+
+---
+
+**Version:** v1.0 (tagged)  
+**Date:** October 22, 2025
+
